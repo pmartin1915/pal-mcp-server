@@ -56,6 +56,7 @@ from tools import (  # noqa: E402
     ConsensusTool,
     DebugIssueTool,
     DocgenTool,
+    HandoffTool,
     ListModelsTool,
     LookupTool,
     PlannerTool,
@@ -277,6 +278,7 @@ TOOLS = {
     "apilookup": LookupTool(),  # Quick web/API lookup instructions
     "listmodels": ListModelsTool(),  # List all available AI models by provider
     "version": VersionTool(),  # Display server version and system information
+    "handoff": HandoffTool(),  # Generate session handoff summaries for seamless transitions
 }
 TOOLS = filter_disabled_tools(TOOLS)
 
@@ -371,6 +373,11 @@ PROMPT_TEMPLATES = {
         "name": "version",
         "description": "Show server version and system information",
         "template": "Show PAL MCP Server version",
+    },
+    "handoff": {
+        "name": "handoff",
+        "description": "Generate session handoff summary",
+        "template": "Generate handoff summary with {model}",
     },
 }
 

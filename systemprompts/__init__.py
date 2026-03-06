@@ -16,6 +16,7 @@ from .secaudit_prompt import SECAUDIT_PROMPT
 from .testgen_prompt import TESTGEN_PROMPT
 from .thinkdeep_prompt import THINKDEEP_PROMPT
 from .tracer_prompt import TRACER_PROMPT
+from .handoff_prompt import HANDOFF_PROMPT
 
 __all__ = [
     "THINKDEEP_PROMPT",
@@ -32,4 +33,5 @@ __all__ = [
     "SECAUDIT_PROMPT",
     "TESTGEN_PROMPT",
     "TRACER_PROMPT",
+    "HANDOFF_PROMPT",
 ]

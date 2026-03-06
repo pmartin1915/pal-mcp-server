@@ -152,6 +152,8 @@ cython_debug/
 *.pem
 .env.local
 .env.*.local
+gemini-keys.json
+key-changes.log
 
 # Test outputs
 test_output/

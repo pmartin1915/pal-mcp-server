@@ -153,3 +153,16 @@ LOCALE = get_env("LOCALE", "") or ""
 # Threading configuration
 # Simple in-memory conversation threading for stateless MCP environment
 # Conversations persist only during the Claude session
+
+# Model Fallback Configuration
+# When a model fails (quota exceeded, rate limit, server error), automatically retry with fallback model
+# This ensures continuity when Gemini Pro is unavailable
+ENABLE_AUTO_FALLBACK = True
+
+# Fallback model mappings: primary model -> fallback model
+# When the primary model fails with a retryable error, the fallback will be tried once
+MODEL_FALLBACKS = {
+    "gemini-3-pro-preview": "gemini-2.5-flash",
+    "gemini-2.5-pro": "gemini-2.5-flash",
+    "pro": "flash",  # Aliases
+}

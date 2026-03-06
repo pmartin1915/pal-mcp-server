@@ -266,6 +266,107 @@ class SimpleTool(BaseTool):
         except AttributeError:
             return []
 
+    def _generate_with_fallback(
+        self,
+        provider,
+        prompt: str,
+        model_name: str,
+        system_prompt: str,
+        temperature: float,
+        thinking_mode: Optional[str],
+        images: Optional[list],
+        logger,
+    ):
+        """
+        Generate content with automatic fallback to a secondary model on failure.
+
+        If the primary model fails with a retryable error and a fallback model is configured,
+        automatically retries with the fallback model once.
+        """
+        from config import ENABLE_AUTO_FALLBACK, MODEL_FALLBACKS
+
+        try:
+            # Try primary model
+            return provider.generate_content(
+                prompt=prompt,
+                model_name=model_name,
+                system_prompt=system_prompt,
+                temperature=temperature,
+                thinking_mode=thinking_mode,
+                images=images,
+            )
+        except Exception as primary_error:
+            # Check if fallback is enabled and available for this model
+            if not ENABLE_AUTO_FALLBACK:
+                raise
+
+            fallback_model = MODEL_FALLBACKS.get(model_name)
+            if not fallback_model:
+                raise
+
+            # Check if error is fallback-eligible (transient failures)
+            error_str = str(primary_error).lower()
+            fallback_eligible_indicators = [
+                "429",
+                "rate limit",
+                "quota",
+                "resource_exhausted",
+                "timeout",
+                "unavailable",
+                "500",
+                "502",
+                "503",
+                "504",
+            ]
+
+            is_fallback_eligible = any(
+                indicator in error_str for indicator in fallback_eligible_indicators
+            )
+
+            if not is_fallback_eligible:
+                raise
+
+            # Attempt fallback
+            logger.warning(
+                f"Primary model {model_name} failed: {primary_error}. "
+                f"Attempting fallback to {fallback_model}..."
+            )
+
+            try:
+                # Get provider for fallback model
+                from providers.registry import ModelProviderRegistry
+
+                fallback_provider = ModelProviderRegistry.get_provider_for_model(fallback_model)
+                if not fallback_provider:
+                    logger.error(f"No provider found for fallback model {fallback_model}")
+                    raise primary_error
+
+                # Try with fallback model
+                fallback_response = fallback_provider.generate_content(
+                    prompt=prompt,
+                    model_name=fallback_model,
+                    system_prompt=system_prompt,
+                    temperature=temperature,
+                    thinking_mode=thinking_mode,
+                    images=images,
+                )
+
+                logger.info(f"Fallback to {fallback_model} successful")
+
+                # Update the current model name to reflect fallback was used
+                self._current_model_name = fallback_model
+                self._used_fallback = True
+
+                return fallback_response
+
+            except Exception as fallback_error:
+                logger.error(
+                    f"Fallback to {fallback_model} also failed: {fallback_error}. "
+                    f"Original error: {primary_error}"
+                )
+                # Raise the original error as it's more informative
+                raise primary_error
+
     async def execute(self, arguments: dict[str, Any]) -> list:
         """
         Execute the simple tool using the comprehensive flow from old base.py.
@@ -440,17 +541,23 @@ class SimpleTool(BaseTool):
             # Resolve model capabilities for feature gating
             supports_thinking = capabilities.supports_extended_thinking
 
-            # Generate content with provider abstraction
-            model_response = provider.generate_content(
+            # Generate content with provider abstraction (with automatic fallback)
+            self._used_fallback = False
+            model_response = self._generate_with_fallback(
+                provider=provider,
                 prompt=prompt,
                 model_name=self._current_model_name,
                 system_prompt=system_prompt,
                 temperature=temperature,
                 thinking_mode=thinking_mode if supports_thinking else None,
                 images=images if images else None,
+                logger=logger,
             )
 
-            logger.info(f"Received response from {provider.get_provider_type().value} API for {self.get_name()}")
+            if self._used_fallback:
+                logger.info(f"Received response from fallback model {self._current_model_name} for {self.get_name()}")
+            else:
+                logger.info(f"Received response from {provider.get_provider_type().value} API for {self.get_name()}")
 
             # Process the model's response
             if model_response.content:

@@ -20,6 +20,7 @@ from .testgen import TestGenTool
 from .thinkdeep import ThinkDeepTool
 from .tracer import TracerTool
 from .version import VersionTool
+from .handoff import HandoffTool
 
 __all__ = [
     "ThinkDeepTool",
@@ -40,4 +41,5 @@ __all__ = [
     "TestGenTool",
     "TracerTool",
     "VersionTool",
+    "HandoffTool",
 ]
