@@ -400,6 +400,7 @@ def configure_providers():
     from providers.openrouter import OpenRouterProvider
     from providers.shared import ProviderType
     from providers.xai import XAIModelProvider
+    from providers.bedrock import BedrockModelProvider
     from utils.model_restrictions import get_restriction_service
 
     valid_providers = []
@@ -462,6 +463,15 @@ def configure_providers():
         has_native_apis = True
         logger.info("DIAL API key found - DIAL models available")
 
+    # Check for AWS Bedrock credentials
+    aws_key = get_env("AWS_ACCESS_KEY_ID")
+    has_bedrock = False
+    if aws_key:
+        valid_providers.append("AWS Bedrock")
+        has_bedrock = True
+        has_native_apis = True
+        logger.info("AWS credentials found - Bedrock models available")
+
     # Check for OpenRouter API key
     openrouter_key = get_env("OPENROUTER_API_KEY")
     logger.debug(f"OpenRouter key check: key={'[PRESENT]' if openrouter_key else '[MISSING]'}")
@@ -517,6 +527,10 @@ def configure_providers():
             ModelProviderRegistry.register_provider(ProviderType.DIAL, DIALModelProvider)
             registered_providers.append(ProviderType.DIAL.value)
             logger.debug(f"Registered provider: {ProviderType.DIAL.value}")
+        if has_bedrock:
+            ModelProviderRegistry.register_provider(ProviderType.BEDROCK, BedrockModelProvider)
+            registered_providers.append(ProviderType.BEDROCK.value)
+            logger.debug(f"Registered provider: {ProviderType.BEDROCK.value}")
 
     # 2. Custom provider second (for local/private models)
     if has_custom:
@@ -547,6 +561,7 @@ def configure_providers():
             "- GEMINI_API_KEY for Gemini models\n"
             "- OPENAI_API_KEY for OpenAI models\n"
             "- XAI_API_KEY for X.AI GROK models\n"
+            "- AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY for AWS Bedrock\n"
             "- DIAL_API_KEY for DIAL models\n"
             "- OPENROUTER_API_KEY for OpenRouter (multiple models)\n"
             "- CUSTOM_API_URL for local models (Ollama, vLLM, etc.)"
