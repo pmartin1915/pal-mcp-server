@@ -105,10 +105,7 @@
     {
       "model_name": "google/gemini-3-pro-preview",
       "aliases": [
-        "pro",
-        "gemini-pro",
-        "gemini",
-        "gemini3",
+        "gemini3-openrouter",
         "pro-openrouter"
       ],
       "context_window": 1048576,
@@ -489,6 +486,70 @@
       "temperature_constraint": "range",
       "description": "xAI's Grok 4 via OpenRouter with vision and advanced reasoning",
       "intelligence_score": 15
+    },
+    {
+      "model_name": "openrouter/free",
+      "aliases": [
+        "free",
+        "auto-free"
+      ],
+      "context_window": 200000,
+      "max_output_tokens": 8192,
+      "supports_extended_thinking": false,
+      "supports_json_mode": false,
+      "supports_function_calling": false,
+      "supports_images": false,
+      "max_image_size_mb": 0.0,
+      "description": "OpenRouter auto-router (FREE) — picks best available free model automatically",
+      "intelligence_score": 12
+    },
+    {
+      "model_name": "qwen/qwen3.6-plus-preview:free",
+      "aliases": [
+        "qwen-free",
+        "qwen3-free"
+      ],
+      "context_window": 1000000,
+      "max_output_tokens": 16384,
+      "supports_extended_thinking": false,
+      "supports_json_mode": true,
+      "supports_function_calling": false,
+      "supports_images": false,
+      "max_image_size_mb": 0.0,
+      "description": "Qwen 3.6 Plus Preview (FREE) — 1M context, strong reasoning",
+      "intelligence_score": 14
+    },
+    {
+      "model_name": "nousresearch/hermes-3-llama-3.1-405b:free",
+      "aliases": [
+        "hermes-free",
+        "llama-405b-free"
+      ],
+      "context_window": 131072,
+      "max_output_tokens": 8192,
+      "supports_extended_thinking": false,
+      "supports_json_mode": false,
+      "supports_function_calling": false,
+      "supports_images": false,
+      "max_image_size_mb": 0.0,
+      "description": "Hermes 3 Llama 3.1 405B (FREE) — largest open-weight model, intermittent availability",
+      "intelligence_score": 14
+    },
+    {
+      "model_name": "nvidia/nemotron-3-super-120b-a12b:free",
+      "aliases": [
+        "nemotron-free",
+        "nvidia-free"
+      ],
+      "context_window": 262144,
+      "max_output_tokens": 8192,
+      "supports_extended_thinking": false,
+      "supports_json_mode": false,
+      "supports_function_calling": false,
+      "supports_images": false,
+      "max_image_size_mb": 0.0,
+      "description": "NVIDIA Nemotron 3 Super 120B MoE (FREE) — 262K context, strong reasoning",
+      "intelligence_score": 13
     },
     {
       "model_name": "x-ai/grok-4.1-fast",
