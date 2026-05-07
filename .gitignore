@@ -189,3 +189,6 @@ logs/
 /worktrees/
 test_simulation_files/
 .mcp.json
+
+# Layer 2 daily call ledger (runtime artifact, per-machine)
+.pal-call-log.jsonl
