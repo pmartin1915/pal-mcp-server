@@ -50,6 +50,8 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
         self._ensure_registry()
         super().__init__(api_key, **kwargs)
         self._client = None
+        self._billed_api_key = get_env("GEMINI_API_KEY_BILLED")
+        self._billed_client = None
         self._token_counters = {}  # Cache for token counting
         self._base_url = kwargs.get("base_url", None)  # Optional custom endpoint
         self._timeout_override = self._resolve_http_timeout()
@@ -63,27 +65,42 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
     # Client access
     # ------------------------------------------------------------------
 
+    def _make_genai_client(self, api_key: str):
+        """Create a genai.Client with the shared http options."""
+        http_options_kwargs: dict[str, object] = {}
+        if self._base_url:
+            http_options_kwargs["base_url"] = self._base_url
+        if self._timeout_override is not None:
+            http_options_kwargs["timeout"] = self._timeout_override
+        if http_options_kwargs:
+            http_options = types.HttpOptions(**http_options_kwargs)
+            return genai.Client(api_key=api_key, http_options=http_options)
+        return genai.Client(api_key=api_key)
+
     @property
     def client(self):
-        """Lazy initialization of Gemini client."""
+        """Lazy initialization of primary Gemini client (free-tier key)."""
         if self._client is None:
-            http_options_kwargs: dict[str, object] = {}
-            if self._base_url:
-                http_options_kwargs["base_url"] = self._base_url
-            if self._timeout_override is not None:
-                http_options_kwargs["timeout"] = self._timeout_override
-
-            if http_options_kwargs:
-                http_options = types.HttpOptions(**http_options_kwargs)
-                logger.debug(
-                    "Initializing Gemini client with options: base_url=%s timeout=%s",
-                    http_options_kwargs.get("base_url"),
-                    http_options_kwargs.get("timeout"),
-                )
-                self._client = genai.Client(api_key=self.api_key, http_options=http_options)
-            else:
-                self._client = genai.Client(api_key=self.api_key)
+            logger.debug(
+                "Initializing Gemini client with options: base_url=%s timeout=%s",
+                self._base_url,
+                self._timeout_override,
+            )
+            self._client = self._make_genai_client(self.api_key)
         return self._client
+
+    @property
+    def billed_client(self):
+        """Lazy initialization of fallback Gemini client (billed key, GEMINI_API_KEY_BILLED).
+
+        Returns None when GEMINI_API_KEY_BILLED is not set so callers can guard
+        with a simple ``if self.billed_client`` check.
+        """
+        if not self._billed_api_key:
+            return None
+        if self._billed_client is None:
+            self._billed_client = self._make_genai_client(self._billed_api_key)
+        return self._billed_client
 
     def _resolve_http_timeout(self) -> Optional[float]:
         """Compute timeout override from shared custom timeout environment variables."""
@@ -237,87 +254,7 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
                 contents=contents,
                 config=generation_config,
             )
-
-            usage = self._extract_usage(response)
-
-            finish_reason_str = "UNKNOWN"
-            is_blocked_by_safety = False
-            safety_feedback_details = None
-
-            if response.candidates:
-                candidate = response.candidates[0]
-
-                try:
-                    finish_reason_enum = candidate.finish_reason
-                    if finish_reason_enum:
-                        try:
-                            finish_reason_str = finish_reason_enum.name
-                        except AttributeError:
-                            finish_reason_str = str(finish_reason_enum)
-                    else:
-                        finish_reason_str = "STOP"
-                except AttributeError:
-                    finish_reason_str = "STOP"
-
-                if not response.text:
-                    try:
-                        safety_ratings = candidate.safety_ratings
-                        if safety_ratings:
-                            for rating in safety_ratings:
-                                try:
-                                    if rating.blocked:
-                                        is_blocked_by_safety = True
-                                        category_name = "UNKNOWN"
-                                        probability_name = "UNKNOWN"
-
-                                        try:
-                                            category_name = rating.category.name
-                                        except (AttributeError, TypeError):
-                                            pass
-
-                                        try:
-                                            probability_name = rating.probability.name
-                                        except (AttributeError, TypeError):
-                                            pass
-
-                                        safety_feedback_details = (
-                                            f"Category: {category_name}, Probability: {probability_name}"
-                                        )
-                                        break
-                                except (AttributeError, TypeError):
-                                    continue
-                    except (AttributeError, TypeError):
-                        pass
-
-            elif response.candidates is not None and len(response.candidates) == 0:
-                is_blocked_by_safety = True
-                finish_reason_str = "SAFETY"
-                safety_feedback_details = "Prompt blocked, reason unavailable"
-
-                try:
-                    prompt_feedback = response.prompt_feedback
-                    if prompt_feedback and prompt_feedback.block_reason:
-                        try:
-                            block_reason_name = prompt_feedback.block_reason.name
-                        except AttributeError:
-                            block_reason_name = str(prompt_feedback.block_reason)
-                        safety_feedback_details = f"Prompt blocked, reason: {block_reason_name}"
-                except (AttributeError, TypeError):
-                    pass
-
-            return ModelResponse(
-                content=response.text,
-                usage=usage,
-                model_name=resolved_model_name,
-                friendly_name="Gemini",
-                provider=ProviderType.GOOGLE,
-                metadata={
-                    "thinking_mode": effective_thinking_mode if capabilities.supports_extended_thinking else None,
-                    "finish_reason": finish_reason_str,
-                    "is_blocked_by_safety": is_blocked_by_safety,
-                    "safety_feedback": safety_feedback_details,
-                },
-            )
+            return self._build_model_response(response, resolved_model_name, effective_thinking_mode, capabilities)
 
         try:
             result = self._run_with_retries(
@@ -332,7 +269,41 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
         except Exception as exc:
             attempts = max(attempt_counter["value"], 1)
             exc_lower = str(exc).lower()
-            if any(p in exc_lower for p in ("quota", "resource_exhausted", "429")):
+            is_quota_error = any(p in exc_lower for p in ("quota", "resource_exhausted", "429"))
+
+            if is_quota_error and self.billed_client is not None:
+                logger.warning(
+                    "Primary Gemini key quota exhausted for %s — falling back to GEMINI_API_KEY_BILLED",
+                    resolved_model_name,
+                )
+                try:
+                    response = self.billed_client.models.generate_content(
+                        model=resolved_model_name,
+                        contents=contents,
+                        config=generation_config,
+                    )
+                    result = self._build_model_response(
+                        response, resolved_model_name, effective_thinking_mode, capabilities
+                    )
+                    if budget_enabled:
+                        append_entry(ledger_path, resolved_model_name, datetime.now(timezone.utc).isoformat())
+                    logger.info("Billed key fallback succeeded for %s", resolved_model_name)
+                    return result
+                except Exception as billed_exc:
+                    billed_lower = str(billed_exc).lower()
+                    if any(p in billed_lower for p in ("quota", "resource_exhausted", "429")):
+                        raise RuntimeError(
+                            f"Both Gemini keys exhausted for {resolved_model_name}. "
+                            f"Free-tier key and GEMINI_API_KEY_BILLED both hit quota. "
+                            f"Layer A cap (200/day) may be reached across all machines. "
+                            f"Check Cloud Console → APIs & Services → Quotas. "
+                            f"Original: {billed_exc}"
+                        ) from billed_exc
+                    raise RuntimeError(
+                        f"Gemini billed key fallback failed for {resolved_model_name}: {billed_exc}"
+                    ) from billed_exc
+
+            if is_quota_error:
                 error_msg = (
                     f"Google Cloud daily quota exhausted for {resolved_model_name} "
                     f"(Layer A hard cap hit — applies across all machines). "
@@ -345,6 +316,83 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
                     f"{'s' if attempts > 1 else ''}: {exc}"
                 )
             raise RuntimeError(error_msg) from exc
+
+    def _build_model_response(self, response, resolved_model_name: str, effective_thinking_mode: str, capabilities) -> ModelResponse:
+        """Parse a raw Gemini SDK response into a ModelResponse."""
+        usage = self._extract_usage(response)
+        finish_reason_str = "UNKNOWN"
+        is_blocked_by_safety = False
+        safety_feedback_details = None
+
+        if response.candidates:
+            candidate = response.candidates[0]
+            try:
+                finish_reason_enum = candidate.finish_reason
+                if finish_reason_enum:
+                    try:
+                        finish_reason_str = finish_reason_enum.name
+                    except AttributeError:
+                        finish_reason_str = str(finish_reason_enum)
+                else:
+                    finish_reason_str = "STOP"
+            except AttributeError:
+                finish_reason_str = "STOP"
+
+            if not response.text:
+                try:
+                    safety_ratings = candidate.safety_ratings
+                    if safety_ratings:
+                        for rating in safety_ratings:
+                            try:
+                                if rating.blocked:
+                                    is_blocked_by_safety = True
+                                    category_name = "UNKNOWN"
+                                    probability_name = "UNKNOWN"
+                                    try:
+                                        category_name = rating.category.name
+                                    except (AttributeError, TypeError):
+                                        pass
+                                    try:
+                                        probability_name = rating.probability.name
+                                    except (AttributeError, TypeError):
+                                        pass
+                                    safety_feedback_details = (
+                                        f"Category: {category_name}, Probability: {probability_name}"
+                                    )
+                                    break
+                            except (AttributeError, TypeError):
+                                continue
+                except (AttributeError, TypeError):
+                    pass
+
+        elif response.candidates is not None and len(response.candidates) == 0:
+            is_blocked_by_safety = True
+            finish_reason_str = "SAFETY"
+            safety_feedback_details = "Prompt blocked, reason unavailable"
+            try:
+                prompt_feedback = response.prompt_feedback
+                if prompt_feedback and prompt_feedback.block_reason:
+                    try:
+                        block_reason_name = prompt_feedback.block_reason.name
+                    except AttributeError:
+                        block_reason_name = str(prompt_feedback.block_reason)
+                    safety_feedback_details = f"Prompt blocked, reason: {block_reason_name}"
+            except (AttributeError, TypeError):
+                pass
+
+        return ModelResponse(
+            content=response.text,
+            usage=usage,
+            model_name=resolved_model_name,
+            friendly_name="Gemini",
+            provider=ProviderType.GOOGLE,
+            metadata={
+                "thinking_mode": effective_thinking_mode if capabilities.supports_extended_thinking else None,
+                "finish_reason": finish_reason_str,
+                "is_blocked_by_safety": is_blocked_by_safety,
+                "safety_feedback": safety_feedback_details,
+            },
+        )
 
     def get_provider_type(self) -> ProviderType:
         """Get the provider type."""
