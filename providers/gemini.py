@@ -2,6 +2,7 @@
 
 import base64
 import logging
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, ClassVar, Optional
 
 if TYPE_CHECKING:
@@ -10,6 +11,8 @@ if TYPE_CHECKING:
 from google import genai
 from google.genai import types
 
+from utils.call_budget import evaluate_budget, parse_ledger, tally_today
+from utils.call_budget_io import append_entry, get_ledger_path, load_config_from_env, read_ledger
 from utils.env import get_env
 from utils.image_utils import validate_image
 
@@ -144,6 +147,27 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
         capability_map = self.get_all_model_capabilities()
 
         resolved_model_name = self._resolve_model_name(model_name)
+
+        # Layer B: per-machine soft budget gate
+        budget_cfg = load_config_from_env()
+        budget_enabled = budget_cfg.get("enabled", True)
+        ledger_path = get_ledger_path() if budget_enabled else None
+        if budget_enabled:
+            daily_count = tally_today(
+                parse_ledger(read_ledger(ledger_path)),
+                resolved_model_name,
+                datetime.now(timezone.utc),
+            )
+            gate = evaluate_budget(daily_count, resolved_model_name, budget_cfg)
+            if not gate["allowed"]:
+                cap = budget_cfg.get("budgets", {}).get(resolved_model_name, "?")
+                raise RuntimeError(
+                    f"PAL daily budget reached for {resolved_model_name} on this machine "
+                    f"({cap} calls/day soft cap). To increase: set "
+                    f"PAL_DAILY_BUDGET_GEMINI_25_PRO or PAL_DAILY_BUDGET_GEMINI_25_FLASH in .env. "
+                    f"To bypass: set PAL_BUDGET_ENABLED=false. "
+                    f"Google Cloud hard cap (Layer A) remains active across all machines."
+                )
 
         # Prepare content parts (text and potentially images)
         parts = []
@@ -296,18 +320,30 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
             )
 
         try:
-            return self._run_with_retries(
+            result = self._run_with_retries(
                 operation=_attempt,
                 max_attempts=max_retries,
                 delays=retry_delays,
                 log_prefix=f"Gemini API ({resolved_model_name})",
             )
+            if budget_enabled:
+                append_entry(ledger_path, resolved_model_name, datetime.now(timezone.utc).isoformat())
+            return result
         except Exception as exc:
             attempts = max(attempt_counter["value"], 1)
-            error_msg = (
-                f"Gemini API error for model {resolved_model_name} after {attempts} attempt"
-                f"{'s' if attempts > 1 else ''}: {exc}"
-            )
+            exc_lower = str(exc).lower()
+            if any(p in exc_lower for p in ("quota", "resource_exhausted", "429")):
+                error_msg = (
+                    f"Google Cloud daily quota exhausted for {resolved_model_name} "
+                    f"(Layer A hard cap hit — applies across all machines). "
+                    f"Check Cloud Console → APIs & Services → Quotas to verify your daily limit. "
+                    f"Original: {exc}"
+                )
+            else:
+                error_msg = (
+                    f"Gemini API error for model {resolved_model_name} after {attempts} attempt"
+                    f"{'s' if attempts > 1 else ''}: {exc}"
+                )
             raise RuntimeError(error_msg) from exc
 
     def get_provider_type(self) -> ProviderType:
