@@ -14,11 +14,24 @@ Additionally, this fix properly handles home directory containers:
   and handled by is_home_directory_root() in resolve_and_validate_path()
 """
 
+import sys
 from pathlib import Path
+
+import pytest
 
 from utils.security_config import is_dangerous_path
 
+# /etc, /usr, /var, /home are POSIX paths — on Windows these strings don't
+# correspond to real system directories and is_dangerous_path correctly
+# returns False. Cross-platform Windows-path coverage lives in
+# TestWindowsPathHandling below.
+posix_only = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="POSIX system paths; Windows coverage is in TestWindowsPathHandling",
+)
 
+
+@posix_only
 class TestPathTraversalFix:
     """Test that subdirectories of dangerous system paths are blocked."""
 
@@ -58,6 +71,7 @@ class TestPathTraversalFix:
         assert is_dangerous_path(Path("/tmp/my_etc_files")) is False
 
 
+@posix_only
 class TestHomeDirectoryHandling:
     """Test that home directory containers are handled correctly.
 
@@ -88,6 +102,7 @@ class TestHomeDirectoryHandling:
         assert is_dangerous_path(Path("/home/user/documents/work/project/src")) is False
 
 
+@posix_only
 class TestRegressionPrevention:
     """Regression tests for the specific vulnerability."""
 
