@@ -270,8 +270,14 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
             attempts = max(attempt_counter["value"], 1)
             exc_lower = str(exc).lower()
             is_quota_error = any(p in exc_lower for p in ("quota", "resource_exhausted", "429"))
+            # Per-minute throttles also return 429/RESOURCE_EXHAUSTED but resolve on retry —
+            # promoting to the billed key for those wastes the daily Layer A allowance.
+            is_per_minute_throttle = any(
+                p in exc_lower for p in ("per minute", "perminute", "tokens per min")
+            )
+            should_fall_back = is_quota_error and not is_per_minute_throttle
 
-            if is_quota_error and self.billed_client is not None:
+            if should_fall_back and self.billed_client is not None:
                 logger.warning(
                     "Primary Gemini key quota exhausted for %s — falling back to GEMINI_API_KEY_BILLED",
                     resolved_model_name,
@@ -303,7 +309,12 @@ class GeminiModelProvider(RegistryBackedProviderMixin, ModelProvider):
                         f"Gemini billed key fallback failed for {resolved_model_name}: {billed_exc}"
                     ) from billed_exc
 
-            if is_quota_error:
+            if is_per_minute_throttle:
+                error_msg = (
+                    f"Gemini per-minute rate limit hit for {resolved_model_name} "
+                    f"(transient — retry after 60s). Original: {exc}"
+                )
+            elif is_quota_error:
                 error_msg = (
                     f"Google Cloud daily quota exhausted for {resolved_model_name} "
                     f"(Layer A hard cap hit — applies across all machines). "
