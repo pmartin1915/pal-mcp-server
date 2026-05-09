@@ -5,16 +5,27 @@ and don't break existing functionality.
 """
 
 import os
+import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
 import pytest
 
+# These tests `source` run-server.sh under bash. On Windows the only `bash`
+# on PATH is typically the WSL launcher, which fails with 0xd0000022 when no
+# distro is installed. Skip rather than report a false negative.
+needs_bash = pytest.mark.skipif(
+    sys.platform == "win32" or shutil.which("bash") is None,
+    reason="bash not available (Windows / no bash on PATH)",
+)
+
 
 class TestPipDetectionFix:
     """Test cases for issue #188: PIP is available but not recognized."""
 
+    @needs_bash
     def test_run_server_script_syntax_valid(self):
         """Test that run-server.sh has valid bash syntax."""
         result = subprocess.run(["bash", "-n", "./run-server.sh"], capture_output=True, text=True)
@@ -46,6 +57,8 @@ class TestPipDetectionFix:
         assert 'cd "$(dirname' in content, "Should convert to absolute path"
 
         # Test successful completion - our fix should make the script more robust
+        if sys.platform == "win32" or shutil.which("bash") is None:
+            pytest.skip("bash not available")
         result = subprocess.run(["bash", "-n", "./run-server.sh"], capture_output=True, text=True)
         assert result.returncode == 0, "Script should have valid syntax after our fix"
 
@@ -100,6 +113,7 @@ class TestPipDetectionFix:
         for pattern in expected_diagnostic_patterns:
             assert pattern in content, f"Enhanced diagnostic pattern '{pattern}' should be in script"
 
+    @needs_bash
     def test_setup_env_file_does_not_create_bsd_backup(self, tmp_path):
         """Ensure setup_env_file avoids creating .env'' artifacts (BSD sed behavior)."""
         script_path = Path("./run-server.sh").resolve()
