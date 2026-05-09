@@ -71,10 +71,11 @@ class TestModelRestrictionService:
                 assert service.is_allowed(ProviderType.OPENAI, "o4-mini")
                 assert not service.is_allowed(ProviderType.OPENAI, "o3")
 
-                # Check Google models
+                # Check Google models — `pro` aliases to gemini-2.5-pro
+                # (was gemini-3-pro-preview before the billing-footgun remap).
                 assert service.is_allowed(ProviderType.GOOGLE, "flash")
                 assert service.is_allowed(ProviderType.GOOGLE, "pro")
-                assert service.is_allowed(ProviderType.GOOGLE, "gemini-3-pro-preview")
+                assert service.is_allowed(ProviderType.GOOGLE, "gemini-2.5-pro")
 
     def test_case_insensitive_and_whitespace_handling(self):
         """Test that model names are case-insensitive and whitespace is trimmed."""
@@ -367,7 +368,7 @@ class TestCustomProviderOpenRouterRestrictions:
         assert not provider.validate_model_name("haiku")
 
         # Should still validate custom models defined in conf/custom_models.json
-        assert provider.validate_model_name("local-llama")
+        assert provider.validate_model_name("codestral-latest")
 
     @patch.dict(os.environ, {"OPENROUTER_ALLOWED_MODELS": "opus", "OPENROUTER_API_KEY": "test-key"})
     def test_custom_provider_openrouter_capabilities_restrictions(self):
@@ -390,7 +391,7 @@ class TestCustomProviderOpenRouterRestrictions:
             provider.get_capabilities("haiku")
 
         # Should still work for custom models
-        capabilities = provider.get_capabilities("local-llama")
+        capabilities = provider.get_capabilities("codestral-latest")
         assert capabilities.provider == ProviderType.CUSTOM
 
     @patch.dict(os.environ, {"OPENROUTER_ALLOWED_MODELS": "opus"}, clear=False)
@@ -413,7 +414,7 @@ class TestCustomProviderOpenRouterRestrictions:
         assert not provider.validate_model_name("haiku")
 
         # Should still validate custom models
-        assert provider.validate_model_name("local-llama")
+        assert provider.validate_model_name("codestral-latest")
 
     @patch.dict(os.environ, {"OPENROUTER_ALLOWED_MODELS": "", "OPENROUTER_API_KEY": "test-key"})
     def test_custom_provider_empty_restrictions_allows_all_openrouter(self):

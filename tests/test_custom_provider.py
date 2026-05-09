@@ -40,7 +40,7 @@ class TestCustomProvider:
         provider = CustomProvider(api_key="test-key", base_url="http://localhost:11434/v1")
 
         # Known model should validate
-        assert provider.validate_model_name("llama3.2")
+        assert provider.validate_model_name("codestral-latest")
 
         # For custom provider, unknown models return False when not in registry
         # This is expected behavior - custom models need to be declared in custom_models.json
@@ -63,7 +63,7 @@ class TestCustomProvider:
                 provider.get_capabilities("o3")
 
             # Test with a custom model from the local registry
-            capabilities = provider.get_capabilities("local-llama")
+            capabilities = provider.get_capabilities("codestral-latest")
             assert capabilities.provider == ProviderType.CUSTOM
             assert capabilities.context_window > 0
 
@@ -91,16 +91,16 @@ class TestCustomProvider:
         resolved = provider._resolve_model_name("llama")
         assert resolved == "meta-llama/llama-3-70b"
 
-        # Test local model alias
-        resolved_local = provider._resolve_model_name("local-llama")
-        assert resolved_local == "llama3.2"
+        # Test local model alias — `codestral` aliases to codestral-latest
+        resolved_local = provider._resolve_model_name("codestral")
+        assert resolved_local == "codestral-latest"
 
     def test_no_thinking_mode_support(self):
         """Custom provider generic capabilities default to no thinking mode."""
         provider = CustomProvider(api_key="test-key", base_url="http://localhost:11434/v1")
 
-        # llama3.2 is a known model that should work
-        assert not provider.get_capabilities("llama3.2").supports_extended_thinking
+        # codestral-latest is a known model that should work
+        assert not provider.get_capabilities("codestral-latest").supports_extended_thinking
 
         # Unknown models should raise error
         with pytest.raises(ValueError, match="Unsupported model 'any-model' for provider custom"):
