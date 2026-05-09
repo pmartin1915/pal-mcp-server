@@ -192,3 +192,6 @@ test_simulation_files/
 
 # Layer 2 daily call ledger (runtime artifact, per-machine)
 .pal-call-log.jsonl
+
+# MS Office owner/lock files (created while a doc is open)
+~$*
