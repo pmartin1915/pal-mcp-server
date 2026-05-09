@@ -93,8 +93,10 @@ class TestProviderRoutingBugs:
                 f"but got {provider.get_provider_type()}"
             )
 
-            # Test common aliases that should all route to OpenRouter
-            test_models = ["flash", "pro", "o3", "o3-mini", "o4-mini"]
+            # Test common aliases that should all route to OpenRouter.
+            # Use `pro-2.5-openrouter` (the OR-suffixed alias) since bare `pro`
+            # was deliberately removed from the OpenRouter registry.
+            test_models = ["flash", "pro-2.5-openrouter", "o3", "o3-mini", "o4-mini"]
             for model_name in test_models:
                 provider = tool.get_model_provider(model_name)
                 assert provider is not None, f"Should find provider for '{model_name}'"
@@ -269,7 +271,7 @@ class TestOpenRouterAliasRestrictions:
             os.environ.pop("OPENAI_API_KEY", None)
             os.environ.pop("XAI_API_KEY", None)
             os.environ["OPENROUTER_API_KEY"] = "test-key"
-            os.environ["OPENROUTER_ALLOWED_MODELS"] = "o3-mini,pro,gpt4.1,flash,o4-mini,o3"  # User's exact config
+            os.environ["OPENROUTER_ALLOWED_MODELS"] = "o3-mini,pro-2.5-openrouter,gpt4.1,flash,o4-mini,o3"
 
             # Register OpenRouter provider
             from providers.openrouter import OpenRouterProvider
@@ -287,13 +289,13 @@ class TestOpenRouterAliasRestrictions:
 
             # Expected aliases that should resolve to models:
             # o3-mini -> openai/o3-mini
-            # pro -> google/gemini-2.5-pro
+            # pro-2.5-openrouter -> google/gemini-2.5-pro
             # flash -> google/gemini-2.5-flash
             # o4-mini -> openai/o4-mini
             # o3 -> openai/o3
             # gpt4.1 -> should not exist (expected to be filtered out)
 
-            expected_models = {"o3-mini", "pro", "flash", "o4-mini", "o3"}
+            expected_models = {"o3-mini", "pro-2.5-openrouter", "flash", "o4-mini", "o3"}
 
             available_model_names = set(available_models.keys())
 
