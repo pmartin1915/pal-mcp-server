@@ -119,6 +119,19 @@ def test_error_listing_respects_env_restrictions(monkeypatch, reset_registry):
         "AZURE_MODELS_CONFIG_PATH",
     ):
         monkeypatch.delenv(azure_var, raising=False)
+    # Bedrock activates on AWS credentials in the host env; strip so its
+    # nova/mistral/llama models don't leak into the available-models listing.
+    for aws_var in (
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_SESSION_TOKEN",
+        "AWS_PROFILE",
+        "AWS_DEFAULT_PROFILE",
+        "AWS_REGION",
+        "AWS_DEFAULT_REGION",
+        "BEDROCK_ALLOWED_MODELS",
+    ):
+        monkeypatch.delenv(aws_var, raising=False)
 
     ModelProviderRegistry.reset_for_testing()
     model_restrictions._restriction_service = None
