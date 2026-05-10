@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -32,6 +33,11 @@ CASSETTE_PATH = CASSETTE_DIR / "gemini25_pro_calculator" / "mldev.json"
 CASSETTE_REPLAY_ID = "chat_codegen/gemini25_pro_calculator/mldev"
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32" and not sys.flags.utf8_mode,
+    reason="google-genai _replay_api_client opens cassette without encoding= "
+    "and corrupts U+2502 on cp1252. Run with PYTHONUTF8=1 to enable.",
+)
 @pytest.mark.asyncio
 @pytest.mark.no_mock_provider
 async def test_chat_codegen_saves_file(monkeypatch, tmp_path):

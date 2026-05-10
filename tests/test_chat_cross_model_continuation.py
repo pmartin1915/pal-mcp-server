@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 import uuid
 from pathlib import Path
 
@@ -53,6 +54,11 @@ def _extract_number(text: str) -> str:
     return ""
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32" and not sys.flags.utf8_mode,
+    reason="google-genai _replay_api_client opens cassette without encoding= "
+    "and corrupts U+2502 on cp1252. Run with PYTHONUTF8=1 to enable.",
+)
 @pytest.mark.asyncio
 @pytest.mark.no_mock_provider
 async def test_chat_cross_model_continuation(monkeypatch, tmp_path):
