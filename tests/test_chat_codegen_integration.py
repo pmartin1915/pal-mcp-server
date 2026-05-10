@@ -21,7 +21,9 @@ from pathlib import Path
 import pytest
 
 from providers.gemini import GeminiModelProvider
+from providers.openai import OpenAIModelProvider
 from providers.registry import ModelProviderRegistry, ProviderType
+from providers.xai import XAIModelProvider
 from tools.chat import ChatTool
 
 REPLAYS_ROOT = Path(__file__).parent / "gemini_cassettes"
@@ -63,40 +65,52 @@ async def test_chat_codegen_saves_file(monkeypatch, tmp_path):
         ModelProviderRegistry.reset_for_testing()
         ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
 
-        working_dir = tmp_path / "codegen"
-        working_dir.mkdir()
-        preexisting = working_dir / "pal_generated.code"
-        preexisting.write_text("stale contents", encoding="utf-8")
+        try:
+            working_dir = tmp_path / "codegen"
+            working_dir.mkdir()
+            preexisting = working_dir / "pal_generated.code"
+            preexisting.write_text("stale contents", encoding="utf-8")
 
-        chat_tool = ChatTool()
-        prompt = (
-            "Please generate a Python module with functions `add` and `multiply` that perform"
-            " basic addition and multiplication. Produce the response using the structured"
-            " <GENERATED-CODE> format so the assistant can apply the files directly."
-        )
+            chat_tool = ChatTool()
+            prompt = (
+                "Please generate a Python module with functions `add` and `multiply` that perform"
+                " basic addition and multiplication. Produce the response using the structured"
+                " <GENERATED-CODE> format so the assistant can apply the files directly."
+            )
 
-        result = await chat_tool.execute(
-            {
-                "prompt": prompt,
-                "model": "gemini-2.5-pro",
-                "working_directory_absolute_path": str(working_dir),
-            }
-        )
+            result = await chat_tool.execute(
+                {
+                    "prompt": prompt,
+                    "model": "gemini-2.5-pro",
+                    "working_directory_absolute_path": str(working_dir),
+                }
+            )
 
-        provider = ModelProviderRegistry.get_provider_for_model("gemini-2.5-pro")
-        if provider is not None:
+            provider = ModelProviderRegistry.get_provider_for_model("gemini-2.5-pro")
+            if provider is not None:
+                try:
+                    provider.client.close()
+                except AttributeError:
+                    pass
+        finally:
+            # Reset restriction-service singleton — a stale cache here would
+            # otherwise leak GOOGLE_ALLOWED_MODELS=gemini-2.5-pro into every
+            # subsequent test in the run.
             try:
-                provider.client.close()
-            except AttributeError:
+                from utils import model_restrictions
+
+                model_restrictions._restriction_service = None  # type: ignore[attr-defined]
+            except Exception:
                 pass
 
-        # Reset restriction service cache to avoid leaking allowed-model config
-        try:
-            from utils import model_restrictions
-
-            model_restrictions._restriction_service = None  # type: ignore[attr-defined]
-        except Exception:
-            pass
+            # Restore the provider registry conftest set up at session start.
+            # Without this, reset_for_testing() above leaks: subsequent tests
+            # run with only GOOGLE registered, breaking the conversation
+            # memory tests that expect OpenAI/XAI providers to exist.
+            ModelProviderRegistry.reset_for_testing()
+            ModelProviderRegistry.register_provider(ProviderType.GOOGLE, GeminiModelProvider)
+            ModelProviderRegistry.register_provider(ProviderType.OPENAI, OpenAIModelProvider)
+            ModelProviderRegistry.register_provider(ProviderType.XAI, XAIModelProvider)
 
     assert result and result[0].type == "text"
     payload = json.loads(result[0].text)
