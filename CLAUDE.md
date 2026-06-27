@@ -318,3 +318,23 @@ isort --check-only .
 - Proper API keys configured in `.env` file
 
 This guide provides everything needed to efficiently work with the PAL MCP Server codebase using Claude. Always run quality checks before and after making changes to ensure code integrity.
+
+---
+
+## Agent Workflow
+
+### Delegation (Opus → Sonnet)
+
+**Delegate to Sonnet:** running test suites, lint/format checks, adding new tool stubs from clear specs, documentation updates, git operations, simple refactors.
+
+**Opus handles directly:** MCP protocol changes, system prompt modifications, provider integration logic, security-sensitive code (API key handling, authentication), cross-provider orchestration decisions, debugging communication failures.
+
+After Sonnet completes any task, Opus must review. Always run `./code_quality_checks.sh` before accepting changes.
+
+### Cross-Model Audit
+
+Since PAL MCP Server IS the cross-model bridge, test changes by exercising the tools themselves. After modifying a provider or tool, verify by calling the tool through MCP and confirming correct model routing.
+
+### Session State
+
+For multi-session work, maintain `ai/STATE.md` and `ai/DECISIONS.md` in the project root. Update STATE.md after every significant action to ensure session continuity.
