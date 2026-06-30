@@ -65,6 +65,7 @@ def test_error_listing_respects_env_restrictions(monkeypatch, reset_registry):
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai")
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-openrouter")
     monkeypatch.delenv("XAI_API_KEY", raising=False)
+    monkeypatch.delenv("ZHIPU_API_KEY", raising=False)
     # Ensure Azure provider stays disabled regardless of developer workstation env
     for azure_var in (
         "AZURE_OPENAI_API_KEY",
@@ -86,6 +87,7 @@ def test_error_listing_respects_env_restrictions(monkeypatch, reset_registry):
     monkeypatch.setenv("OPENAI_ALLOWED_MODELS", "gpt-5.2")
     monkeypatch.setenv("OPENROUTER_ALLOWED_MODELS", "gpt5nano")
     monkeypatch.setenv("XAI_ALLOWED_MODELS", "")
+    monkeypatch.setenv("ZHIPU_ALLOWED_MODELS", "")
 
     import config
 
@@ -107,10 +109,11 @@ def test_error_listing_respects_env_restrictions(monkeypatch, reset_registry):
         ("OPENAI_ALLOWED_MODELS", "gpt-5.2"),
         ("OPENROUTER_ALLOWED_MODELS", "gpt5nano"),
         ("XAI_ALLOWED_MODELS", ""),
+        ("ZHIPU_ALLOWED_MODELS", ""),
     ):
         monkeypatch.setenv(key, value)
 
-    for var in ("XAI_API_KEY", "CUSTOM_API_URL", "CUSTOM_API_KEY", "DIAL_API_KEY"):
+    for var in ("XAI_API_KEY", "ZHIPU_API_KEY", "CUSTOM_API_URL", "CUSTOM_API_KEY", "DIAL_API_KEY"):
         monkeypatch.delenv(var, raising=False)
     for azure_var in (
         "AZURE_OPENAI_API_KEY",
@@ -185,6 +188,7 @@ def test_error_listing_without_restrictions_shows_full_catalog(monkeypatch, rese
         "OPENAI_ALLOWED_MODELS",
         "OPENROUTER_ALLOWED_MODELS",
         "XAI_ALLOWED_MODELS",
+        "ZHIPU_ALLOWED_MODELS",
         "DIAL_ALLOWED_MODELS",
     ):
         monkeypatch.delenv(var, raising=False)
