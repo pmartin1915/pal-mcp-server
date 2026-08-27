@@ -1,19 +1,23 @@
 {
   "_README": {
-    "description": "Model metadata for Mistral AI (free Experiment tier via CUSTOM_API_URL).",
-    "documentation": "https://docs.mistral.ai/getting-started/models/",
-    "usage": "Each entry is advertised by the Custom provider. Free tier: 1B tokens/month, 2 RPM, 500K TPM.",
-    "swap_note": "To switch to Groq, change CUSTOM_API_URL and CUSTOM_API_KEY in .env. Both keys are saved."
+    "description": "Model metadata for the local Ollama endpoint on the RX 7900 XTX, advertised by the Custom provider via CUSTOM_API_URL.",
+    "documentation": "https://docs.ollama.com/api",
+    "usage": "Each entry is advertised by the Custom provider. The Custom provider has exactly ONE base_url (providers/registry.py:108-117), so this file must describe whatever CUSTOM_API_URL points at. It currently points at http://localhost:11434/v1.",
+    "provenance": "Capability flags below are measured on this machine, not copied: context_window from /api/ps on a loaded model; supports_function_calling from the 'tools' capability in /api/show; supports_images and supports_extended_thinking from the absence of 'vision'/'thinking' there; supports_json_mode from a live response_format=json_object call that returned valid JSON; supports_temperature from a live generate at temperature=0.0 that returned. Measured 2026-08-27 against ollama 0.32.15.",
+    "drift_hazard": "This file is an assertion about a machine, and nothing checks it. If a model is removed (ollama rm), the entry advertises a model that 404s; if OLLAMA_CONTEXT_LENGTH is ever set, context_window below goes stale. Verify with: curl -s http://localhost:11434/v1/models. See decisions.md D-017.",
+    "context_note": "32768 is what ollama 0.32.15 SERVES, not what these models were trained for (the 30b's trained maximum is 262144). It is a server default, not a model property, and it moves if OLLAMA_CONTEXT_LENGTH is set. Do not raise these numbers from a model card. Note also that context_window is the TOTAL budget shared by input and output: a caller must keep (input tokens + requested output tokens) <= 32768, so the effective prompt ceiling is 32768 minus whatever output it asks for. Exceeding it is rejected or truncated by the server, not by this file.",
+    "history_note": "This file previously described Mistral cloud models reached through CUSTOM_API_URL. D-008 repointed CUSTOM_API_URL at Ollama on 2026-08-26 without updating this file, which left every entry here resolving to a 404 for ~24h. Those entries are preserved in git commit 7448101. Restoring that lane needs a re-issued Mistral key AND the single Custom slot back; see decisions.md D-017.",
+    "policy_fields_not_measured": "Two fields below are POLICY, not measurements, and must not be read as capability claims. max_output_tokens (8192) is a chosen cap, not a model limit. allow_code_generation is a permission this project grants, not something the Ollama API reports. intelligence_score (12/10) is deliberately low so auto-selection does not silently route other PAL consumers' traffic onto this machine's GPU; it is a routing policy value and NOT a judgement of model quality — see decisions.md D-010 for the actual measured performance."
   },
   "models": [
     {
-      "model_name": "codestral-latest",
+      "model_name": "qwen3-coder:30b",
       "aliases": [
-        "codestral",
-        "mistral-code"
+        "qwen3-coder",
+        "local-coder"
       ],
-      "context_window": 131000,
-      "max_output_tokens": 32768,
+      "context_window": 32768,
+      "max_output_tokens": 8192,
       "supports_extended_thinking": false,
       "supports_json_mode": true,
       "supports_function_calling": true,
@@ -21,17 +25,17 @@
       "max_image_size_mb": 0.0,
       "supports_temperature": true,
       "allow_code_generation": true,
-      "description": "Codestral on Mistral (FREE 1B tokens/month) — code-specialized, 131K context",
-      "intelligence_score": 15
+      "description": "Qwen3-Coder 30B-A3B on local Ollama (FREE, no network). Fastest model on this machine: 131.6 tok/s cold, 20.23 GiB resident, no CPU spill (decisions.md D-010). max_output_tokens is a conservative policy cap, not a measured limit.",
+      "intelligence_score": 12
     },
     {
-      "model_name": "mistral-large-latest",
+      "model_name": "qwen2.5-coder:14b",
       "aliases": [
-        "mistral-large",
-        "mistral-free"
+        "qwen2.5-coder",
+        "local-small"
       ],
-      "context_window": 131000,
-      "max_output_tokens": 32768,
+      "context_window": 32768,
+      "max_output_tokens": 8192,
       "supports_extended_thinking": false,
       "supports_json_mode": true,
       "supports_function_calling": true,
@@ -39,24 +43,8 @@
       "max_image_size_mb": 0.0,
       "supports_temperature": true,
       "allow_code_generation": true,
-      "description": "Mistral Large 2 (FREE 1B tokens/month) — flagship reasoning, 131K context",
-      "intelligence_score": 15
-    },
-    {
-      "model_name": "mistral-small-latest",
-      "aliases": [
-        "mistral-small"
-      ],
-      "context_window": 131000,
-      "max_output_tokens": 32768,
-      "supports_extended_thinking": false,
-      "supports_json_mode": true,
-      "supports_function_calling": true,
-      "supports_images": false,
-      "max_image_size_mb": 0.0,
-      "supports_temperature": true,
-      "description": "Mistral Small (FREE 1B tokens/month) — fast and efficient, 131K context",
-      "intelligence_score": 11
+      "description": "Qwen2.5-Coder 14B on local Ollama (FREE, no network). The pinned unattended fallback tail (dispatcher shared.json:280, operator GO 2026-08-25). 62.9 tok/s, 14.24 GiB resident. max_output_tokens is a conservative policy cap, not a measured limit.",
+      "intelligence_score": 10
     }
   ]
 }
