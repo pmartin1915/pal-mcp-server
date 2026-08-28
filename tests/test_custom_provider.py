@@ -40,7 +40,7 @@ class TestCustomProvider:
         provider = CustomProvider(api_key="test-key", base_url="http://localhost:11434/v1")
 
         # Known model should validate
-        assert provider.validate_model_name("codestral-latest")
+        assert provider.validate_model_name("qwen3-coder:30b")
 
         # For custom provider, unknown models return False when not in registry
         # This is expected behavior - custom models need to be declared in custom_models.json
@@ -63,7 +63,7 @@ class TestCustomProvider:
                 provider.get_capabilities("o3")
 
             # Test with a custom model from the local registry
-            capabilities = provider.get_capabilities("codestral-latest")
+            capabilities = provider.get_capabilities("qwen3-coder:30b")
             assert capabilities.provider == ProviderType.CUSTOM
             assert capabilities.context_window > 0
 
@@ -91,16 +91,16 @@ class TestCustomProvider:
         resolved = provider._resolve_model_name("llama")
         assert resolved == "meta-llama/llama-3-70b"
 
-        # Test local model alias — `codestral` aliases to codestral-latest
-        resolved_local = provider._resolve_model_name("codestral")
-        assert resolved_local == "codestral-latest"
+        # Test local model alias — `qwen3-coder` aliases to qwen3-coder:30b
+        resolved_local = provider._resolve_model_name("qwen3-coder")
+        assert resolved_local == "qwen3-coder:30b"
 
     def test_no_thinking_mode_support(self):
         """Custom provider generic capabilities default to no thinking mode."""
         provider = CustomProvider(api_key="test-key", base_url="http://localhost:11434/v1")
 
-        # codestral-latest is a known model that should work
-        assert not provider.get_capabilities("codestral-latest").supports_extended_thinking
+        # qwen3-coder:30b is a known model that should work
+        assert not provider.get_capabilities("qwen3-coder:30b").supports_extended_thinking
 
         # Unknown models should raise error
         with pytest.raises(ValueError, match="Unsupported model 'any-model' for provider custom"):
