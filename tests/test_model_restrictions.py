@@ -368,7 +368,7 @@ class TestCustomProviderOpenRouterRestrictions:
         assert not provider.validate_model_name("haiku")
 
         # Should still validate custom models defined in conf/custom_models.json
-        assert provider.validate_model_name("codestral-latest")
+        assert provider.validate_model_name("qwen3-coder:30b")
 
     @patch.dict(os.environ, {"OPENROUTER_ALLOWED_MODELS": "opus", "OPENROUTER_API_KEY": "test-key"})
     def test_custom_provider_openrouter_capabilities_restrictions(self):
@@ -391,7 +391,7 @@ class TestCustomProviderOpenRouterRestrictions:
             provider.get_capabilities("haiku")
 
         # Should still work for custom models
-        capabilities = provider.get_capabilities("codestral-latest")
+        capabilities = provider.get_capabilities("qwen3-coder:30b")
         assert capabilities.provider == ProviderType.CUSTOM
 
     @patch.dict(os.environ, {"OPENROUTER_ALLOWED_MODELS": "opus"}, clear=False)
@@ -414,7 +414,7 @@ class TestCustomProviderOpenRouterRestrictions:
         assert not provider.validate_model_name("haiku")
 
         # Should still validate custom models
-        assert provider.validate_model_name("codestral-latest")
+        assert provider.validate_model_name("qwen3-coder:30b")
 
     @patch.dict(os.environ, {"OPENROUTER_ALLOWED_MODELS": "", "OPENROUTER_API_KEY": "test-key"})
     def test_custom_provider_empty_restrictions_allows_all_openrouter(self):

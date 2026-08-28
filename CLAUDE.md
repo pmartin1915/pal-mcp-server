@@ -213,8 +213,8 @@ python -m pytest tests/ --cov=. --cov-report=html -m "not integration"
 # 2. Start Ollama service
 ollama serve
 
-# 3. Pull a model (e.g., llama3.2)
-ollama pull llama3.2
+# 3. Pull a model (the registered local models are qwen3-coder:30b and qwen2.5-coder:14b)
+ollama pull qwen2.5-coder:14b
 
 # 4. Set environment variable for custom provider
 export CUSTOM_API_URL="http://localhost:11434"
@@ -316,5 +316,20 @@ isort --check-only .
 - Python 3.9+ with virtual environment
 - All dependencies from `requirements.txt` installed
 - Proper API keys configured in `.env` file
+
+### Local models on perrypc
+
+The `Custom` provider is wired to the local Ollama endpoint:
+
+- `CUSTOM_API_URL=http://localhost:11434/v1` (set in `.env`).
+- Registered models live in `conf/custom_models.json`:
+  - `qwen3-coder:30b` — aliases `qwen3-coder`, `local-coder` (attended fast lane).
+  - `qwen2.5-coder:14b` — aliases `qwen2.5-coder`, `local-small` (dispatcher unattended fallback tail).
+
+**Auto-mode behavior:** `DEFAULT_MODEL=auto` ranks models by `intelligence_score`. The local entries are deliberately scored low (`local-coder`=12, `local-small`=10) so auto-selection does **not** silently send other consumers' traffic to the GPU. To use the local model, pass the model name explicitly, e.g. `model=local-coder` or `model=qwen3-coder:30b`.
+
+**Context window:** Ollama 0.32.15 serves these models with a total context length of **32768** tokens, regardless of the model-card maximum. Keep `(input tokens + max_output_tokens) <= 32768` to avoid silent truncation.
+
+**VRAM policy:** The RX 7900 XTX holds exactly one large model resident at a time. Loading `qwen2.5-coder:14b` evicts a resident `qwen3-coder:30b` and vice versa. Do not assume an idle GPU for unattended calls; the dispatcher fallback tail intentionally uses the 14b model. See `perrypc_takeover/decisions.md` D-026.
 
 This guide provides everything needed to efficiently work with the PAL MCP Server codebase using Claude. Always run quality checks before and after making changes to ensure code integrity.
