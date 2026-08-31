@@ -6,8 +6,8 @@
     "provenance": "Capability flags below are measured on this machine, not copied: context_window from /api/ps on a loaded model; supports_function_calling from the 'tools' capability in /api/show; supports_images and supports_extended_thinking from the absence of 'vision'/'thinking' there; supports_json_mode from a live response_format=json_object call that returned valid JSON; supports_temperature from a live generate at temperature=0.0 that returned. Measured 2026-08-27 against ollama 0.32.15.",
     "drift_hazard": "This file is an assertion about a machine, and nothing checks it. If a model is removed (ollama rm), the entry advertises a model that 404s; if OLLAMA_CONTEXT_LENGTH is ever set, context_window below goes stale. Verify with: curl -s http://localhost:11434/v1/models. See decisions.md D-017.",
     "context_note": "32768 is what ollama 0.32.15 SERVES, not what these models were trained for (the 30b's trained maximum is 262144). It is a server default, not a model property, and it moves if OLLAMA_CONTEXT_LENGTH is set. Do not raise these numbers from a model card. Note also that context_window is the TOTAL budget shared by input and output: a caller must keep (input tokens + requested output tokens) <= 32768, so the effective prompt ceiling is 32768 minus whatever output it asks for. Exceeding it is rejected or truncated by the server, not by this file.",
-    "history_note": "This file previously described Mistral cloud models reached through CUSTOM_API_URL. D-008 repointed CUSTOM_API_URL at Ollama on 2026-08-26 without updating this file, which left every entry here resolving to a 404 for ~24h. Those entries are preserved in git commit 7448101. Restoring that lane needs a re-issued Mistral key AND the single Custom slot back; see decisions.md D-017.",
-    "policy_fields_not_measured": "Two fields below are POLICY, not measurements, and must not be read as capability claims. max_output_tokens (8192) is a chosen cap, not a model limit. allow_code_generation is a permission this project grants, not something the Ollama API reports. intelligence_score (12/10) is deliberately low so auto-selection does not silently route other PAL consumers' traffic onto this machine's GPU; it is a routing policy value and NOT a judgement of model quality — see decisions.md D-010 for the actual measured performance."
+    "history_note": "This file previously described Mistral cloud models reached through CUSTOM_API_URL. D-008 repointed CUSTOM_API_URL at Ollama on 2026-08-26 without updating this file, which left every entry here resolving to a 404 for ~24h. Those entries are preserved in git commit 7448101. Restoring that lane needs a re-issued Mistral key AND the single Custom slot back; see decisions.md D-017. 2026-08-30: added served-context tags qwen3-coder:30b-48k and qwen3.8:27b-80k (D-031); intelligence_score kept in the deprioritized band per D-026 - opt-in-by-name, auto mode must not silently route here.",
+    "policy_fields_not_measured": "Two fields below are POLICY, not measurements, and must not be read as capability claims. max_output_tokens (8192) is a chosen cap, not a model limit. allow_code_generation is a permission this project grants, not something the Ollama API reports. intelligence_score (12/10) is deliberately low so auto-selection does not silently route other PAL consumers' traffic onto this machine's GPU; it is a routing policy value and NOT a judgement of model quality \u00e2\u20ac\u201d see decisions.md D-010 for the actual measured performance."
   },
   "models": [
     {
@@ -45,6 +45,41 @@
       "allow_code_generation": true,
       "description": "Qwen2.5-Coder 14B on local Ollama (FREE, no network). The pinned unattended fallback tail (dispatcher shared.json:280, operator GO 2026-08-25). 62.9 tok/s, 14.24 GiB resident. max_output_tokens is a conservative policy cap, not a measured limit.",
       "intelligence_score": 10
+    },
+    {
+      "model_name": "qwen3-coder:30b-48k",
+      "aliases": [
+        "local-coder-48k"
+      ],
+      "context_window": 49152,
+      "max_output_tokens": 8192,
+      "supports_extended_thinking": false,
+      "supports_json_mode": true,
+      "supports_function_calling": true,
+      "supports_images": false,
+      "max_image_size_mb": 0.0,
+      "supports_temperature": true,
+      "allow_code_generation": true,
+      "description": "Qwen3-Coder 30B-A3B, 48K served-context tag (Modelfile num_ctx; takeover D-031: -c 49152 spawned, KV 4608 MiB, 21.74 GiB resident, no spill). Same weights as qwen3-coder:30b. context_window is the measured SERVED total (input+output budget).",
+      "intelligence_score": 12
+    },
+    {
+      "model_name": "qwen3.8:27b-80k",
+      "aliases": [
+        "local-planner",
+        "local-planner-80k"
+      ],
+      "context_window": 81920,
+      "max_output_tokens": 8192,
+      "supports_extended_thinking": false,
+      "supports_json_mode": true,
+      "supports_function_calling": true,
+      "supports_images": false,
+      "max_image_size_mb": 0.0,
+      "supports_temperature": true,
+      "allow_code_generation": true,
+      "description": "Qwen3.8 27B, 80K served-context planner tag (takeover D-031/D-035 addendum: KV 5440 MiB @ 81920 cells, no spill; 96K does NOT fit - hybrid-recurrent buffer). 45.3 tok/s (D-010): planner, not workhorse. Model has thinking+vision capabilities but neither is measured through this /v1 path; flags stay false until they are (policy, not measurement).",
+      "intelligence_score": 11
     }
   ]
 }

@@ -95,6 +95,12 @@ class TestCustomProvider:
         resolved_local = provider._resolve_model_name("qwen3-coder")
         assert resolved_local == "qwen3-coder:30b"
 
+        # Served-context tags (takeover D-031): opt-in-by-name aliases resolve
+        assert provider._resolve_model_name("local-coder-48k") == "qwen3-coder:30b-48k"
+        assert provider._resolve_model_name("local-planner") == "qwen3.8:27b-80k"
+        assert provider.get_capabilities("qwen3-coder:30b-48k").context_window == 49152
+        assert provider.get_capabilities("qwen3.8:27b-80k").context_window == 81920
+
     def test_no_thinking_mode_support(self):
         """Custom provider generic capabilities default to no thinking mode."""
         provider = CustomProvider(api_key="test-key", base_url="http://localhost:11434/v1")
