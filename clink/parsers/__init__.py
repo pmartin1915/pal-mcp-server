@@ -6,6 +6,7 @@ from .base import BaseParser, ParsedCLIResponse, ParserError
 from .claude import ClaudeJSONParser
 from .codex import CodexJSONLParser
 from .gemini import GeminiJSONParser
+from .kimi import KimiStreamJSONParser
 from .qwen import QwenJSONParser
 
 _PARSER_CLASSES: dict[str, type[BaseParser]] = {
@@ -13,6 +14,7 @@ _PARSER_CLASSES: dict[str, type[BaseParser]] = {
     GeminiJSONParser.name: GeminiJSONParser,
     ClaudeJSONParser.name: ClaudeJSONParser,
     QwenJSONParser.name: QwenJSONParser,
+    KimiStreamJSONParser.name: KimiStreamJSONParser,
 }
 
 

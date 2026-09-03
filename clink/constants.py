@@ -45,6 +45,16 @@ INTERNAL_DEFAULTS: dict[str, CLIInternalDefaults] = {
         default_role_prompt="systemprompts/clink/default.txt",
         runner="qwen",
     ),
+    "kimi": CLIInternalDefaults(
+        parser="kimi_stream_json",
+        # --print implies --yolo (auto-approves every action) -- same class as
+        # codex's bypass flag. The utf-8 pin is load-bearing: kimi crashes on
+        # cp1252 (emoji, smart quotes) and exits 0 with empty stdout.
+        additional_args=["--print", "--output-format", "stream-json"],
+        env={"PYTHONIOENCODING": "utf-8"},
+        default_role_prompt="systemprompts/clink/default.txt",
+        runner="kimi",
+    ),
     "claude": CLIInternalDefaults(
         parser="claude_json",
         additional_args=["--print", "--output-format", "json"],
