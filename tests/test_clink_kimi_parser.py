@@ -54,7 +54,7 @@ def test_single_message_success_excludes_think():
     assert parsed.metadata["tool_calls"] == 0
 
 
-def test_tool_round_trip_returns_final_text_only():
+def test_tool_round_trip_returns_final_text():
     stdout = _stream(
         _assistant(tool_calls=_SHELL_CALL),
         _tool_result("75c6caa roadmaps: something\n"),
@@ -67,6 +67,17 @@ def test_tool_round_trip_returns_final_text_only():
     assert parsed.metadata["tool_calls"] == 1
 
 
+def test_multi_step_assistant_text_is_preserved_in_order():
+    # Findings often sit on the tool-calling message; the final one just says Done.
+    stdout = _stream(
+        _assistant("Finding: the lock file is stale.", tool_calls=_SHELL_CALL),
+        _tool_result("ok\n"),
+        _assistant("Done."),
+    )
+    parsed = KimiStreamJSONParser().parse(stdout, "")
+    assert parsed.content == "Finding: the lock file is stale.\n\nDone."
+
+
 def test_empty_stdout_is_an_error_even_with_exit_zero():
     with pytest.raises(ParserError, match="empty stdout"):
         KimiStreamJSONParser().parse("", "")
@@ -76,6 +87,15 @@ def test_plain_text_stdout_without_messages_surfaces_raw_text():
     # `kimi -m bogus-model` prints this and exits 0.
     with pytest.raises(ParserError, match="LLM not set"):
         KimiStreamJSONParser().parse("LLM not set\n", "")
+
+
+def test_plain_text_trailer_after_valid_message_is_a_failure():
+    # Kimi exits 0 on provider failures and prints them as plain text.
+    stdout = _stream(_assistant("Partial, not final")) + "LLM not set\n"
+    with pytest.raises(ParserError) as excinfo:
+        KimiStreamJSONParser().parse(stdout, "")
+    assert "LLM not set" in str(excinfo.value)
+    assert "Partial, not final" in str(excinfo.value)
 
 
 def test_stream_ending_on_tool_result_is_incomplete():
@@ -99,11 +119,11 @@ def test_final_assistant_without_text_is_an_error():
     assert "earlier prose" in str(excinfo.value)
 
 
-def test_junk_lines_are_counted_not_fatal():
-    stdout = "DEBUG something\n" + _stream(_assistant("OK")) + "not json\n"
+def test_leading_junk_lines_are_counted_not_fatal():
+    stdout = "DEBUG something\n" + _stream(_assistant("OK"))
     parsed = KimiStreamJSONParser().parse(stdout, "")
     assert parsed.content == "OK"
-    assert parsed.metadata["unparsed_lines"] == 2
+    assert parsed.metadata["unparsed_lines"] == 1
 
 
 def test_stderr_is_preserved_in_metadata():
