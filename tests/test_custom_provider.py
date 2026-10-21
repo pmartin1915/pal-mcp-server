@@ -91,9 +91,13 @@ class TestCustomProvider:
         resolved = provider._resolve_model_name("llama")
         assert resolved == "meta-llama/llama-3-70b"
 
-        # Test local model alias — `qwen3-coder` aliases to qwen3-coder:30b
+        # Test local model aliases — `qwen3-coder` and `local-coder` resolve to the
+        # -48k workhorse tag (2026-10-21, Perry: one resident copy on the GPU
+        # instead of two). The plain tag stays reachable by its exact name.
         resolved_local = provider._resolve_model_name("qwen3-coder")
-        assert resolved_local == "qwen3-coder:30b"
+        assert resolved_local == "qwen3-coder:30b-48k"
+        assert provider._resolve_model_name("local-coder") == "qwen3-coder:30b-48k"
+        assert provider._resolve_model_name("qwen3-coder:30b") == "qwen3-coder:30b"
 
         # Served-context tags (takeover D-031): opt-in-by-name aliases resolve
         assert provider._resolve_model_name("local-coder-48k") == "qwen3-coder:30b-48k"
