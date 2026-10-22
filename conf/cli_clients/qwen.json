@@ -2,7 +2,12 @@
   "name": "qwen",
   "command": "qwen",
   "additional_args": [],
-  "env": {},
+  "env": {
+    "OPENAI_BASE_URL": "http://100.87.5.64:11434/v1",
+    "OPENAI_API_KEY": "ollama",
+    "OPENAI_MODEL": "qwen3-coder:30b-48k",
+    "QWEN_HOME": "C:/Users/perry/.qwen-clink"
+  },
   "roles": {
     "default": {
       "prompt_path": "systemprompts/clink/default.txt",
